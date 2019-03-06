@@ -44,6 +44,8 @@ Notes:
 - don't set the initial cycle point up to "now" or in the future, or the
   date-time clock triggers will hold execution until their trigger times
   come up.
+- one task in each suite is configured to abort with a message on the first try,
+  then succeed on a second try.
 - after modifying for the Kafka system (below) we can consider expanding the
   number of events reported (e.g. by contriving some failed job submissions,
   custom warning events, etc.)
