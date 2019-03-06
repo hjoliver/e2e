@@ -63,6 +63,10 @@ Notes:
 1. Then modify to drive the new system - i.e. to use PBS and pump event
    messages and data availability messages into Kafka, and (regional case) to
    trigger off of data availability messages in Kafka.
+   1. (run script) set the BATCH_SYS varaible to "pbs" instead of "background"
+      (this will be propagated to both suites). Note sure if you need to set
+      the "job host" similarly (depends if your PBS container looks like
+      another host or just like pbs?)
    1. (both suites) replace the *list of handled events* and the event handler
       command line with the BOM event handler, and the command line form that
       it expects.
