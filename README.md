@@ -69,6 +69,8 @@ Notes:
    1. (regional suite) replace the `suite_state_x` external trigger function
       declaration with that for the BOM Kafka consumer for cross-suite
       triggering.
+   1. in case of trouble with containers, note that the basic system here shows
+      how everything should work when configured properly.
 
 ## Global suite:
 
