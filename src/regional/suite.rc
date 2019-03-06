@@ -1,0 +1,102 @@
+#!Jinja2
+
+# Take input from command line.
+{% set N_MEMBERS = ENSEMBLE_SIZE | default(2) | int %}
+{% set GLOBAL_DATA_DIR = DATA_DIR | default("/tmp") %}
+{% set BATCH_SYS = BATCH_SYS | default("background") %}
+{% set JOB_HOST = JOB_HOST | default("localhost") %}
+{% set UPSTREAM_SUITE = UPSTREAM_SUITE | default("global") %}
+{% set UPSTREAM_TASK = UPSTREAM_TASK | default("forecast") %}
+
+[cylc]
+   UTC mode = True
+   cycle point format = %Y%m%dT%H%MZ
+[meta]
+  title = "Regional test suite."
+  priority = "medium"
+[scheduling]
+   initial cycle point = 2001
+   final cycle point = +PT12H
+   [[xtriggers]]
+   {% for i in range(1,N_MEMBERS+1) %}
+       global_m{{i}} = \
+          suite_state_x(suite={{UPSTREAM_SUITE}}, \
+	  task={{UPSTREAM_TASK}}_m{{i}}, \
+          point=%(point)s, \
+          message='data ready regional-m{{i}}.dat'):PT10S
+   {% endfor %}
+   [[dependencies]]
+      [[[R1]]]
+	graph = start => get-obs
+      [[[PT6H]]]
+         graph = """
+   {% for i in range(1,N_MEMBERS+1) %}
+@wall_clock => get-obs =>
+preproc_m{{i}} => assimilation => reg_forecast_m{{i}} => postproc_m{{i}} => products
+@global_m{{i}} & reg_forecast_m{{i}}[-PT6H] => reg_forecast_m{{i}}
+   {% endfor %}
+                 """
+[runtime]
+   [[root]]
+      pre-script = sleep 20
+      [[[meta]]]
+        priority = "low"
+      [[[job]]]
+        batch system = {{BATCH_SYS}}
+        execution time limit = PT25S
+      [[[remote]]]
+        host = {{JOB_HOST}}
+      [[[events]]]
+        # Which task events to handle.
+        handler events = \
+submitted, started, succeeded, failed, custom, critical, warning
+        # Which event handlers to call on these events.
+        handlers = \
+"handler.py event=%(event)s message=%(message)s suite=%(suite)s task=%(id)s priority=%(suite_priority)s:%(priority)s"
+   [[start]]
+   [[assimilation]]
+   [[FORECAST]]
+     [[[meta]]]
+       priority = "high"
+   {% for i in range(1,N_MEMBERS+1) %}
+   [[reg_forecast_m{{i}}]]
+      inherit = FORECAST
+       script = """
+# Extract filename from data availability message.
+GLOBAL_MSG=$global_m{{i}}_message
+GLOBAL_DATA=$(echo $GLOBAL_MSG | sed -e "s/data ready //")
+DATA_FILE={{GLOBAL_DATA_DIR}}/$GLOBAL_DATA
+if [[ ! -f $DATA_FILE ]]; then
+  cylc__job_abort "ERROR: FILE NOT FOUND: $DATA_FILE"
+fi"""
+   {% endfor %}
+   [[PREPROC]]
+   {% for i in range(1,N_MEMBERS+1) %}
+   [[preproc_m{{i}}]]
+      inherit = PREPROC
+   {% endfor %}
+   [[POSTPROC]]
+     [[[job]]]
+       execution retry delays = 2*PT10S
+   {% for i in range(1,N_MEMBERS+1) %}
+   [[postproc_m{{i}}]]
+      inherit = POSTPROC
+   {% endfor %}
+   [[postproc_m1]]
+      script = """
+if (( $CYLC_TASK_TRY_NUMBER  == 1 )); then
+   cylc__job_abort "Help, my HPC blew up!"
+fi"""
+   [[products]]
+
+[visualization]
+   use node color for edges = True
+   [[node attributes]]
+      root = "style=filled", "fontcolor=black"
+      start = "shape=egg", "fillcolor=slategray", "color=slategray", "fontcolor=white"
+      get-obs = "fillcolor=#fa484a", "color=#ca484a", "fontcolor=white"
+      PREPROC = "fillcolor=#28ca4a", "color=#288a4a", "shape=egg"
+      assimilation = "fillcolor=#488aca", "color=#284aca", "fontcolor=white"
+      FORECAST = "fillcolor=orange", "color=#af4800", "shape=hexagon"
+      POSTPROC = "fillcolor=#aa72aa", "color=#6a328a", "shape=ellipse", "fontcolor=white"
+      products = "fillcolor=yellow", "color=#6a328a", "shape=octagon"
